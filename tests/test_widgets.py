@@ -1,6 +1,6 @@
 from PySide6.QtCore import QDate
 
-from jalali_datepicker import JalaliDateEdit, JalaliDateRangeEdit
+from jalali_datepicker import JalaliDateEdit, JalaliDatePicker, JalaliDateRangeEdit, Theme
 
 
 def test_known_nowruz_conversion(qtbot):
@@ -11,6 +11,7 @@ def test_known_nowruz_conversion(qtbot):
 
     assert widget.date() == QDate(2024, 3, 20)
     assert widget.jalali_date() == (1403, 1, 1)
+    assert widget.jalali_text() == "1403/01/01"
 
 
 def test_invalid_jalali_date_raises(qtbot):
@@ -34,6 +35,41 @@ def test_qdate_roundtrip(qtbot):
     restored = widget.qdate_from_jalali(*parts)
 
     assert restored == source
+
+
+def test_picker_clear_and_restore(qtbot):
+    picker = JalaliDatePicker(date=QDate(2026, 8, 29), clearable=True)
+    qtbot.addWidget(picker)
+
+    picker.clear()
+    assert not picker.date().isValid()
+    assert picker.jalali_date() is None
+    assert picker.jalali_text() == ""
+
+    picker.set_jalali_date(1405, 6, 7)
+    assert picker.date().isValid()
+    assert picker.jalali_date() == (1405, 6, 7)
+
+
+def test_picker_applies_theme(qtbot):
+    picker = JalaliDatePicker(theme=Theme.DARK)
+    qtbot.addWidget(picker)
+
+    assert picker.styleSheet()
+    picker.apply_theme(Theme.LIGHT)
+    assert picker.styleSheet()
+
+
+def test_picker_date_range_validation(qtbot):
+    picker = JalaliDatePicker()
+    qtbot.addWidget(picker)
+
+    minimum = QDate(2026, 1, 1)
+    maximum = QDate(2026, 12, 31)
+    picker.set_date_range(minimum, maximum)
+
+    assert picker.date_edit.minimumDate() == minimum
+    assert picker.date_edit.maximumDate() == maximum
 
 
 def test_range_rejects_reverse_dates(qtbot):
