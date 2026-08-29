@@ -6,13 +6,16 @@ No third-party Jalali conversion package is required.
 
 ## Features
 
-- Jalali `QDateEdit` with popup calendar
-- Persian locale and Saturday-first calendar
+- Native Jalali `QDateEdit` with Persian popup calendar
+- Professional `JalaliDatePicker` composite widget
+- Persian locale, RTL layout, and Saturday-first calendar
 - `yyyy/MM/dd` display format
+- Built-in Today and optional Clear actions
+- Light, dark, and system themes
+- Minimum/maximum date range support
 - Jalali ↔ `QDate` conversion helpers
-- `JalaliDateRangeEdit` with linked start/end dates
-- Validation for invalid Jalali dates and reversed ranges
-- Installable `src/` package layout
+- Linked `JalaliDateRangeEdit`
+- Backward-compatible low-level `JalaliDateEdit`
 - Pytest coverage and GitHub Actions CI
 
 ## Install for development
@@ -21,26 +24,67 @@ No third-party Jalali conversion package is required.
 python -m pip install -e ".[test]"
 ```
 
-## Basic usage
+## Professional picker
+
+```python
+from jalali_datepicker import JalaliDatePicker, Theme
+
+picker = JalaliDatePicker(
+    theme=Theme.DARK,
+    show_today_button=True,
+    clearable=True,
+)
+
+picker.set_jalali_date(1405, 6, 7)
+print(picker.jalali_text())
+```
+
+Switch theme at runtime:
+
+```python
+picker.apply_theme(Theme.LIGHT)
+```
+
+Limit the selectable range:
+
+```python
+from PySide6.QtCore import QDate
+
+picker.set_date_range(
+    QDate(2026, 1, 1),
+    QDate(2026, 12, 31),
+)
+```
+
+## Low-level date edit
 
 ```python
 from jalali_datepicker import JalaliDateEdit
 
-picker = JalaliDateEdit()
-picker.set_jalali_date(1405, 6, 7)
+editor = JalaliDateEdit()
+editor.set_jalali_date(1405, 6, 7)
 
-year, month, day = picker.jalali_date()
-qdate = picker.date()
+year, month, day = editor.jalali_date()
+qdate = editor.date()
 ```
 
 ## Date range
 
 ```python
-from jalali_datepicker import JalaliDateRangeEdit
+from jalali_datepicker import JalaliDateRangeEdit, Theme
 
-range_picker = JalaliDateRangeEdit()
+range_picker = JalaliDateRangeEdit(theme=Theme.LIGHT)
 start_qdate, end_qdate = range_picker.date_range()
+start_jalali, end_jalali = range_picker.jalali_range()
 ```
+
+## Signals
+
+`JalaliDatePicker` exposes:
+
+- `dateChanged(QDate)`
+- `jalaliDateChanged(year, month, day)`
+- `cleared()`
 
 ## Run the example
 
