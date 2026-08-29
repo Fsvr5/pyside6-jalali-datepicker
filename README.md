@@ -6,8 +6,12 @@ No third-party Jalali conversion package is required.
 
 ## Features
 
-- Native Jalali `QDateEdit` with Persian popup calendar
+- Native Jalali `QDateEdit`
 - Professional `JalaliDatePicker` composite widget
+- Fully custom `JalaliCalendarWidget`
+- `JalaliPopupDatePicker` with a real custom popup calendar
+- Persian month names and explicit month/year controls
+- Previous/next month navigation
 - Persian locale, RTL layout, and Saturday-first calendar
 - `yyyy/MM/dd` display format
 - Built-in Today and optional Clear actions
@@ -24,12 +28,12 @@ No third-party Jalali conversion package is required.
 python -m pip install -e ".[test]"
 ```
 
-## Professional picker
+## Custom popup picker
 
 ```python
-from jalali_datepicker import JalaliDatePicker, Theme
+from jalali_datepicker import JalaliPopupDatePicker, Theme
 
-picker = JalaliDatePicker(
+picker = JalaliPopupDatePicker(
     theme=Theme.DARK,
     show_today_button=True,
     clearable=True,
@@ -39,13 +43,27 @@ picker.set_jalali_date(1405, 6, 7)
 print(picker.jalali_text())
 ```
 
-Switch theme at runtime:
+The popup uses `JalaliCalendarWidget`, including Persian month names, direct year selection, previous/next month buttons, a Today action, RTL layout, and date-range enforcement.
+
+## Professional picker
 
 ```python
-picker.apply_theme(Theme.LIGHT)
+from jalali_datepicker import JalaliDatePicker, Theme
+
+picker = JalaliDatePicker(theme=Theme.LIGHT)
+picker.set_jalali_date(1405, 6, 7)
 ```
 
-Limit the selectable range:
+## Standalone calendar
+
+```python
+from jalali_datepicker import JalaliCalendarWidget
+
+calendar = JalaliCalendarWidget()
+calendar.set_jalali_date(1405, 1, 1)
+```
+
+## Limit the selectable range
 
 ```python
 from PySide6.QtCore import QDate
@@ -80,11 +98,16 @@ start_jalali, end_jalali = range_picker.jalali_range()
 
 ## Signals
 
-`JalaliDatePicker` exposes:
+`JalaliDatePicker` and `JalaliPopupDatePicker` expose:
 
 - `dateChanged(QDate)`
 - `jalaliDateChanged(year, month, day)`
 - `cleared()`
+
+`JalaliCalendarWidget` exposes:
+
+- `dateSelected(QDate)`
+- `jalaliDateSelected(year, month, day)`
 
 ## Run the example
 
@@ -106,4 +129,4 @@ QT_QPA_PLATFORM=offscreen pytest
 
 ## Design note
 
-Qt stores the selected day as a `QDate`; `QCalendar.System.Jalali` controls how that day is interpreted and presented as Solar Hijri. This keeps the component close to Qt and avoids maintaining a separate date-conversion algorithm.
+Qt stores the selected day as a `QDate`; `QCalendar.System.Jalali` controls how that day is interpreted and presented as Solar Hijri. The custom popup is built from public Qt widgets instead of depending on internal child names of `QCalendarWidget`, which keeps the component more stable across Qt versions.
