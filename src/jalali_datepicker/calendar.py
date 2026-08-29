@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from PySide6.QtCore import QCalendar, QDate, QLocale, Qt, Signal
+from PySide6.QtGui import QColor, QTextCharFormat
 from PySide6.QtWidgets import (
     QCalendarWidget,
     QComboBox,
@@ -13,50 +16,38 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .markers import DayMarker, MarkerStore
 from .themes import Theme, stylesheet
 
 _JALALI = QCalendar(QCalendar.System.Jalali)
 _PERSIAN_LOCALE = QLocale(QLocale.Language.Persian, QLocale.Territory.Iran)
 _MONTHS = (
-    "فروردین",
-    "اردیبهشت",
-    "خرداد",
-    "تیر",
-    "مرداد",
-    "شهریور",
-    "مهر",
-    "آبان",
-    "آذر",
-    "دی",
-    "بهمن",
-    "اسفند",
+    "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+    "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند",
 )
 
 
 class JalaliCalendarWidget(QWidget):
-    """Custom Jalali calendar with stable, explicit month/year navigation."""
+    """Custom Jalali calendar with navigation and extensible day highlighting."""
 
     dateSelected = Signal(QDate)
     jalaliDateSelected = Signal(int, int, int)
 
-    def __init__(
-        self,
-        parent: QWidget | None = None,
-        *,
-        date: QDate | None = None,
-        theme: Theme | str = Theme.SYSTEM,
-    ) -> None:
+    def __init__(self, parent: QWidget | None = None, *, date: QDate | None = None,
+                 theme: Theme | str = Theme.SYSTEM) -> None:
         super().__init__(parent)
         self.setProperty("jalaliPicker", True)
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self._theme = Theme(theme)
         self._syncing = False
+        self._markers = MarkerStore()
+        self._holidays: dict[QDate, str] = {}
+        self._highlight_fridays = True
 
         self.previous_button = QToolButton(self)
         self.previous_button.setText("‹")
         self.previous_button.setToolTip("ماه قبل")
         self.previous_button.setProperty("jalaliAction", True)
-
         self.next_button = QToolButton(self)
         self.next_button.setText("›")
         self.next_button.setToolTip("ماه بعد")
@@ -65,7 +56,6 @@ class JalaliCalendarWidget(QWidget):
         self.month_combo = QComboBox(self)
         self.month_combo.addItems(_MONTHS)
         self.month_combo.setMinimumWidth(120)
-
         self.year_spin = QSpinBox(self)
         self.year_spin.setRange(1, 9999)
         self.year_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
@@ -93,10 +83,8 @@ class JalaliCalendarWidget(QWidget):
 
         self.today_label = QLabel(self)
         self.today_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
         self.today_button = QPushButton("امروز", self)
         self.today_button.setProperty("jalaliAction", True)
-
         footer = QHBoxLayout()
         footer.setContentsMargins(0, 0, 0, 0)
         footer.addWidget(self.today_label, 1)
@@ -121,6 +109,7 @@ class JalaliCalendarWidget(QWidget):
         self.set_date(date if date is not None else QDate.currentDate())
         self._update_today_label()
         self.apply_theme(self._theme)
+        self.refresh_day_formats()
 
     def date(self) -> QDate:
         return self.calendar.selectedDate()
@@ -148,6 +137,63 @@ class JalaliCalendarWidget(QWidget):
         self.calendar.setMinimumDate(minimum)
         self.calendar.setMaximumDate(maximum)
 
+    def set_marker(self, date: QDate, marker: DayMarker) -> None:
+        self._markers.set(date, marker)
+        self.refresh_day_formats()
+
+    def remove_marker(self, date: QDate) -> None:
+        self._markers.remove(date)
+        self.refresh_day_formats()
+
+    def clear_markers(self) -> None:
+        self._markers.clear()
+        self.refresh_day_formats()
+
+    def set_holidays(self, holidays: Iterable[tuple[QDate, str]]) -> None:
+        values: dict[QDate, str] = {}
+        for date, title in holidays:
+            if not date.isValid():
+                raise ValueError("holiday date must be a valid QDate")
+            values[date] = title
+        self._holidays = values
+        self.refresh_day_formats()
+
+    def clear_holidays(self) -> None:
+        self._holidays.clear()
+        self.refresh_day_formats()
+
+    def set_friday_highlight(self, enabled: bool) -> None:
+        self._highlight_fridays = enabled
+        self.refresh_day_formats()
+
+    def refresh_day_formats(self) -> None:
+        """Rebuild special date formats without coupling the widget to a holiday API."""
+        minimum = self.calendar.minimumDate()
+        maximum = self.calendar.maximumDate()
+        for date in list(self._holidays) + [d for d, _ in self._markers.items()]:
+            self.calendar.setDateTextFormat(date, QTextCharFormat())
+
+        # Fridays use the weekday format, so the rule works for every visible month.
+        friday = QTextCharFormat()
+        if self._highlight_fridays:
+            friday.setForeground(QColor("#DC2626"))
+            friday.setFontWeight(700)
+        self.calendar.setWeekdayTextFormat(Qt.DayOfWeek.Friday, friday)
+
+        for date, title in self._holidays.items():
+            if minimum <= date <= maximum:
+                fmt = QTextCharFormat()
+                fmt.setForeground(QColor("#DC2626"))
+                fmt.setFontWeight(700)
+                if title:
+                    fmt.setToolTip(title)
+                self.calendar.setDateTextFormat(date, fmt)
+
+        # Custom application markers intentionally win over holiday styling.
+        for date, marker in self._markers.items():
+            if minimum <= date <= maximum:
+                self.calendar.setDateTextFormat(date, marker.text_format())
+
     def previous_month(self) -> None:
         self.calendar.showPreviousMonth()
 
@@ -166,13 +212,12 @@ class JalaliCalendarWidget(QWidget):
     def apply_theme(self, theme: Theme | str) -> None:
         self._theme = Theme(theme)
         self.setStyleSheet(stylesheet(self._theme))
+        self.refresh_day_formats()
 
     def _header_changed(self) -> None:
         if self._syncing:
             return
-        year = self.year_spin.value()
-        month = self.month_combo.currentIndex() + 1
-        self.calendar.setCurrentPage(year, month)
+        self.calendar.setCurrentPage(self.year_spin.value(), self.month_combo.currentIndex() + 1)
 
     def _page_changed(self, year: int, month: int) -> None:
         self._syncing = True
@@ -195,8 +240,5 @@ class JalaliCalendarWidget(QWidget):
         self.jalaliDateSelected.emit(parts.year, parts.month, parts.day)
 
     def _update_today_label(self) -> None:
-        today = QDate.currentDate()
-        parts = _JALALI.partsFromDate(today)
-        self.today_label.setText(
-            f"امروز: {parts.year:04d}/{parts.month:02d}/{parts.day:02d}"
-        )
+        parts = _JALALI.partsFromDate(QDate.currentDate())
+        self.today_label.setText(f"امروز: {parts.year:04d}/{parts.month:02d}/{parts.day:02d}")
