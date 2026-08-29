@@ -1,6 +1,13 @@
 from PySide6.QtCore import QDate
 
-from jalali_datepicker import JalaliDateEdit, JalaliDatePicker, JalaliDateRangeEdit, Theme
+from jalali_datepicker import (
+    JalaliCalendarWidget,
+    JalaliDateEdit,
+    JalaliDatePicker,
+    JalaliDateRangeEdit,
+    JalaliPopupDatePicker,
+    Theme,
+)
 
 
 def test_known_nowruz_conversion(qtbot):
@@ -70,6 +77,48 @@ def test_picker_date_range_validation(qtbot):
 
     assert picker.date_edit.minimumDate() == minimum
     assert picker.date_edit.maximumDate() == maximum
+
+
+def test_custom_calendar_jalali_navigation(qtbot):
+    calendar = JalaliCalendarWidget(date=QDate(2024, 3, 20))
+    qtbot.addWidget(calendar)
+
+    assert calendar.jalali_date() == (1403, 1, 1)
+    calendar.next_month()
+    assert calendar.month_combo.currentIndex() == 1
+    calendar.previous_month()
+    assert calendar.month_combo.currentIndex() == 0
+
+
+def test_custom_calendar_set_jalali_date(qtbot):
+    calendar = JalaliCalendarWidget()
+    qtbot.addWidget(calendar)
+
+    calendar.set_jalali_date(1404, 12, 29)
+    assert calendar.jalali_date() == (1404, 12, 29)
+
+
+def test_popup_picker_syncs_selected_date(qtbot):
+    picker = JalaliPopupDatePicker(date=QDate(2024, 3, 20))
+    qtbot.addWidget(picker)
+
+    selected = QDate(2024, 4, 1)
+    picker._calendar_selected(selected)
+
+    assert picker.date() == selected
+    assert picker.calendar.date() == selected
+
+
+def test_popup_picker_range_propagates(qtbot):
+    picker = JalaliPopupDatePicker()
+    qtbot.addWidget(picker)
+
+    minimum = QDate(2026, 1, 1)
+    maximum = QDate(2026, 12, 31)
+    picker.set_date_range(minimum, maximum)
+
+    assert picker.calendar.calendar.minimumDate() == minimum
+    assert picker.calendar.calendar.maximumDate() == maximum
 
 
 def test_range_rejects_reverse_dates(qtbot):
