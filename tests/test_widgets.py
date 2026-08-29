@@ -2,12 +2,15 @@ from PySide6.QtCore import QDate, Qt
 
 from jalali_datepicker import (
     DayMarker,
+    Holiday,
     JalaliCalendarWidget,
     JalaliDateEdit,
     JalaliDatePicker,
     JalaliDateRangeEdit,
     JalaliPopupDatePicker,
     Theme,
+    fixed_iran_holidays,
+    merge_holidays,
 )
 
 
@@ -78,6 +81,23 @@ def test_calendar_holiday(qtbot):
     date = QDate(2026, 3, 21)
     calendar.set_holidays([(date, "تعطیل رسمی")])
     assert calendar.calendar.dateTextFormat(date).toolTip() == "تعطیل رسمی"
+
+
+def test_fixed_iran_holidays_include_nowruz():
+    holidays = fixed_iran_holidays(1405)
+    nowruz = JalaliDateEdit.qdate_from_jalali(1405, 1, 1)
+    assert any(item.date == nowruz and item.title == "نوروز" for item in holidays)
+
+
+def test_merge_holidays_preserves_multiple_titles():
+    date = JalaliDateEdit.qdate_from_jalali(1405, 1, 1)
+    merged = merge_holidays(
+        [Holiday(date, "نوروز")],
+        [Holiday(date, "شروع برنامه تولید", official=False)],
+    )
+    assert len(merged) == 1
+    assert "نوروز" in merged[0].title and "شروع برنامه تولید" in merged[0].title
+    assert merged[0].official
 
 
 def test_calendar_friday_highlight_toggle(qtbot):
