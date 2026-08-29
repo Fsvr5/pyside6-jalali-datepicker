@@ -18,9 +18,6 @@ class Demo(QWidget):
             show_today_button=True,
             clearable=True,
         )
-        self.single.set_jalali_minimum = self.single.date_edit.set_jalali_minimum
-        self.single.set_jalali_maximum = self.single.date_edit.set_jalali_maximum
-
         self.range = JalaliDateRangeEdit(theme=Theme.LIGHT)
         self.output = QLabel(self)
         self.output.setWordWrap(True)
